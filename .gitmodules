@@ -1,0 +1,15 @@
+[submodule "evermind-frontend"]
+	path = evermind-frontend
+	url = https://github.com/dgmteam/evermind-frontend
+[submodule "evermind-backend"]
+	path = evermind-backend
+	url = https://github.com/dgmteam/evermind-backend
+[submodule "evermind-generate-document-preview"]
+	path = evermind-preview
+	url = https://github.com/dgmteam/evermind-generate-document-preview
+[submodule "evermind-media"]
+	path = evermind-media
+	url = https://github.com/dgmteam/evermind-media
+[submodule "evermind-storage"]
+	path = evermind-storage
+	url = https://github.com/dgmteam/evermind-storage

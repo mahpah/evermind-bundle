@@ -1,0 +1,204 @@
+version: '2'
+services:
+    api:
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-backend:nightly"
+        environment:
+            ASPNETCORE_ENVIRONMENT: "Docker"
+            ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=api_database;Port=5432;Database=evermind;Pooling=true;"
+            ElasticSearch__Host: "http://elasticsearch"
+            ElasticSearch__Port: "9200"
+            Storage__FileServerUrl: "http://storage_api"
+            FilePreview__FileServerUrl: "http://preview_api"
+        build:
+            context: ./evermind-backend
+            dockerfile: Dockerfile.nightly
+        ports:
+            - "9001:80"
+        links:
+            - elasticsearch
+            - api_database
+        # alter docker command to wait for postgres to start
+        working_dir: /app
+        command: "/app/wait_for_it.sh api_database:5432 -- ./docker_run.sh api_database 5432 evermind postgres DigiMed123 elasticsearch:9200"
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "api"
+
+
+    api_database:
+        image: "postgres"
+        ports:
+            - "9002:5432"
+        environment:
+            POSTGRES_PASSWORD: "DigiMed123"
+            POSTGRES_DB: "evermind"
+        volumes:
+            - api_database:/var/lib/postgresql/data
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "api_database"
+
+    elasticsearch:
+        image: "mahpah/elasticsearch-icu:5.5.1"
+        ports:
+            - "9003:9200"
+        environment:
+            http.host: "0.0.0.0"
+            transport.host: "127.0.0.1"
+            ES_JAVA_OPTS: "-Xms512m -Xmx512m"
+
+        volumes:
+            - esdata:/usr/share/elasticsearch/data
+        mem_limit: 1g
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "elasticsearch"
+
+    media_api:
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-media:nightly"
+        build:
+            context: ./evermind-media
+        environment:
+            NODE_ENV: "docker"
+            DEBUG: "*"
+        ports:
+          - "9004:7777"
+        links:
+          - media_database
+        volumes:
+          - media_tmp:/var/tmp
+          - media:/var/www/media
+
+        # alter docker command to wait for postgres to start
+        working_dir: /evermind-media
+        command: "/bin/bash /evermind-media/scripts/wait_for_it.sh pg:5432 -- node dist/index.js"
+
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "media_api"
+
+    media_database:
+        image: "postgres"
+        ports:
+          - "9005:5432"
+        environment:
+            POSTGRES_PASSWORD: "DigiMed123"
+            POSTGRES_DB: "evermind-media"
+        volumes:
+            - media_database:/var/lib/postgresql/data
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "media_database"
+
+    storage_api:
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-storage:nightly"
+        environment:
+            ASPNETCORE_ENVIRONMENT: "Docker"
+            ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=storage_database;Port=5432;Database=evermind-storage;Pooling=true;"
+        build:
+            context: ./evermind-storage
+        ports:
+            - "9006:80"
+        links:
+            - storage_database
+        volumes:
+            - evm-storage:/evm-storage
+
+        # alter docker command to wait for postgres to start
+        working_dir: /app
+        command: "/bin/bash /app/scripts/wait_for_it.sh storage_database:5432 -- dotnet EVM.StorageApi.dll"
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "storage_api"
+
+    storage_database:
+        image: "postgres"
+        ports:
+            - "9007:5432"
+        environment:
+            POSTGRES_PASSWORD: "DigiMed123"
+            POSTGRES_DB: "evermind-storage"
+        volumes:
+            - storage_database:/var/lib/postgresql/data
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "storage_database"
+
+    preview_api:
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-preview:nightly"
+        environment:
+          ASPNETCORE_ENVIRONMENT: "Docker"
+          ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=preview_database;Port=5432;Database=evermind;Pooling=true;"
+        build:
+            context: ./evermind-generate-document-preview
+        ports:
+          - "9008:80"
+        links:
+          - preview_database
+        volumes:
+          - preview-storage:/preview-storage
+
+        # alter docker command to wait for postgres to start
+        working_dir: /app
+        command: "/bin/bash /app/scripts/wait_for_it.sh preview_database:5432 -- dotnet Evermind.FilePreviewApi.dll"
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "preview_api"
+
+    preview_database:
+        image: "postgres"
+        ports:
+          - "9009:5432"
+        environment:
+            POSTGRES_PASSWORD: "DigiMed123"
+            POSTGRES_DB: "evermind_files_preview"
+        volumes:
+            - preview_pgdata:/var/lib/postgresql/data
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "preview_database"
+
+    frontend:
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-frontend:nightly"
+        build:
+            context: ./evermind-frontend
+        ports:
+            - "80:80"
+        links:
+            - api
+        working_dir: /app
+        command: "/app/wait_for_it.sh api:80 -- nginx -g 'daemon off;'"
+        mem_limit: 256m
+        logging:
+            driver: awslogs
+            options:
+                awslogs-group: "evermind-nightly"
+                awslogs-region: "ap-southeast-1"
+                awslogs-stream-prefix: "frontend"
