@@ -19,7 +19,7 @@ services:
             - api_database
         # alter docker command to wait for postgres to start
         working_dir: /app
-        command: "./wait_for_it.sh api_database:5432 -- ./docker_run.sh api_database 5432 evermind postgres DigiMed123 elasticsearch:9200"
+        command: "/app/wait_for_it.sh api_database:5432 -- ./docker_run.sh api_database 5432 evermind postgres DigiMed123 elasticsearch:9200"
 
     api_database:
         image: "postgres"
@@ -38,6 +38,7 @@ services:
         environment:
             http.host: "0.0.0.0"
             transport.host: "127.0.0.1"
+            ES_JAVA_OPTS: "-Xms512m -Xmx512m"
         volumes:
             - ./volumes/esdata:/usr/share/elasticsearch/data
 
@@ -45,6 +46,7 @@ services:
         environment:
             NODE_ENV: "docker"
             DEBUG: "*"
+        image: digimed/evermind-media:nightly
         build:
             context: ./evermind-media
         ports:
@@ -73,6 +75,7 @@ services:
         environment:
             ASPNETCORE_ENVIRONMENT: "Docker"
             ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=storage_database;Port=5432;Database=evermind-storage;Pooling=true;"
+        image: digimed/evermind-storage:nightly
         build:
             context: ./evermind-storage
         ports:
@@ -100,8 +103,9 @@ services:
         environment:
           ASPNETCORE_ENVIRONMENT: "Docker"
           ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=preview_database;Port=5432;Database=evermind;Pooling=true;"
+        image: digimed/evermind-preview:nightly
         build:
-            context: ./evermind-generate-document-preview
+            context: ./evermind-preview
         ports:
           - "9008:80"
         depends_on:

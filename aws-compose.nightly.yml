@@ -1,6 +1,7 @@
 version: '2'
 services:
     api:
+        mem_limit: 2g
         image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-backend:nightly"
         environment:
             ASPNETCORE_ENVIRONMENT: "Docker"
@@ -17,6 +18,8 @@ services:
         links:
             - elasticsearch
             - api_database
+            - storage_api
+            - preview_api
         # alter docker command to wait for postgres to start
         working_dir: /app
         command: "/app/wait_for_it.sh api_database:5432 -- ./docker_run.sh api_database 5432 evermind postgres DigiMed123 elasticsearch:9200"
@@ -90,6 +93,7 @@ services:
                 awslogs-stream-prefix: "media_api"
 
     media_database:
+        mem_limit: 128m
         image: "postgres"
         ports:
           - "9005:5432"
@@ -130,6 +134,7 @@ services:
                 awslogs-stream-prefix: "storage_api"
 
     storage_database:
+        mem_limit: 128m
         image: "postgres"
         ports:
             - "9007:5432"
@@ -156,6 +161,7 @@ services:
           - "9008:80"
         links:
           - preview_database
+          - media_api
         volumes:
           - preview-storage:/preview-storage
 
@@ -170,6 +176,7 @@ services:
                 awslogs-stream-prefix: "preview_api"
 
     preview_database:
+        mem_limit: 128m
         image: "postgres"
         ports:
           - "9009:5432"
@@ -186,6 +193,7 @@ services:
                 awslogs-stream-prefix: "preview_database"
 
     frontend:
+        mem_limit: 128m
         image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-frontend:nightly"
         build:
             context: ./evermind-frontend
@@ -195,7 +203,6 @@ services:
             - api
         working_dir: /app
         command: "/app/wait_for_it.sh api:80 -- nginx -g 'daemon off;'"
-        mem_limit: 256m
         logging:
             driver: awslogs
             options:
