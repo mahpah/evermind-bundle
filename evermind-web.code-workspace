@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"path": "evermind-backend"
+		},
+		{
+			"path": "evermind-frontend"
+		}
+	],
+	"settings": {}
+}

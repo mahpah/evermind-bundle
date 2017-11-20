@@ -5,14 +5,20 @@ services:
         image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-backend:nightly"
         environment:
             ASPNETCORE_ENVIRONMENT: "Docker"
-            ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=api_database;Port=5432;Database=evermind;Pooling=true;"
             ElasticSearch__Host: "http://elasticsearch"
             ElasticSearch__Port: "9200"
-            Storage__FileServerUrl: "http://storage_api"
-            FilePreview__FileServerUrl: "http://preview_api"
+            Storage__ServerUrl: "http://storage_api/"
+            Storage__PublicUrl: "https://nightly-evermind.antoan.org/storage/"
+            FilePreview__ServerUrl: "http://preview_api/"
+            FilePreview__PublicUrl: "https://nightly-evermind.antoan.org/preview/"
+            PublicUrl: "https://nightly-evermind.antoan.org/"
+            db_host: "api_database"
+            db_port: "5432"
+            db_username: "postgres"
+            db_password: "DigiMed123"
+            db_name: "evermind"
         build:
             context: ./evermind-backend
-            dockerfile: Dockerfile.nightly
         ports:
             - "9001:80"
         links:
@@ -22,7 +28,7 @@ services:
             - preview_api
         # alter docker command to wait for postgres to start
         working_dir: /app
-        command: "/app/wait_for_it.sh api_database:5432 -- ./docker_run.sh api_database 5432 evermind postgres DigiMed123 elasticsearch:9200"
+        command: "./wait_for_it.sh api_database:5432 -- ./docker_run.sh"
         logging:
             driver: awslogs
             options:
@@ -30,16 +36,15 @@ services:
                 awslogs-region: "ap-southeast-1"
                 awslogs-stream-prefix: "api"
 
-
     api_database:
-        image: "postgres"
+        image: "postgres:9.4"
         ports:
             - "9002:5432"
         environment:
             POSTGRES_PASSWORD: "DigiMed123"
             POSTGRES_DB: "evermind"
         volumes:
-            - api_database:/var/lib/postgresql/data
+            - api_database_reset:/var/lib/postgresql/data
         logging:
             driver: awslogs
             options:
@@ -73,6 +78,7 @@ services:
         environment:
             NODE_ENV: "docker"
             DEBUG: "*"
+            MEDIA_ROOT_URI: 'https://nightly-evermind.antoan.org/media/'
         ports:
           - "9004:7777"
         links:
@@ -94,7 +100,7 @@ services:
 
     media_database:
         mem_limit: 128m
-        image: "postgres"
+        image: "postgres:9.4"
         ports:
           - "9005:5432"
         environment:
@@ -113,7 +119,11 @@ services:
         image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-storage:nightly"
         environment:
             ASPNETCORE_ENVIRONMENT: "Docker"
-            ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=storage_database;Port=5432;Database=evermind-storage;Pooling=true;"
+            db_host: "storage_database"
+            db_port: "5432"
+            db_username: "postgres"
+            db_password: "DigiMed123"
+            db_name: "evermind-storage"
         build:
             context: ./evermind-storage
         ports:
@@ -124,8 +134,6 @@ services:
             - evm-storage:/evm-storage
 
         # alter docker command to wait for postgres to start
-        working_dir: /app
-        command: "/bin/bash /app/scripts/wait_for_it.sh storage_database:5432 -- dotnet EVM.StorageApi.dll"
         logging:
             driver: awslogs
             options:
@@ -135,7 +143,7 @@ services:
 
     storage_database:
         mem_limit: 128m
-        image: "postgres"
+        image: "postgres:9.4"
         ports:
             - "9007:5432"
         environment:
@@ -151,23 +159,28 @@ services:
                 awslogs-stream-prefix: "storage_database"
 
     preview_api:
+        mem_limit: 2g
         image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-preview:nightly"
         environment:
-          ASPNETCORE_ENVIRONMENT: "Docker"
-          ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=preview_database;Port=5432;Database=evermind;Pooling=true;"
+            ASPNETCORE_ENVIRONMENT: "Docker"
+            FileProcessor__MediaServerUrl: "https://nightly-evermind.antoan.org/media/"
+            PublicUrl: "https://nightly-evermind.antoan.org/preview/"
+            db_host: "preview_database"
+            db_port: "5432"
+            db_username: "postgres"
+            db_password: "DigiMed123"
+            db_name: "evermind-preview"
         build:
-            context: ./evermind-generate-document-preview
+            context: ./evermind-preview
         ports:
           - "9008:80"
         links:
           - preview_database
           - media_api
         volumes:
-          - preview-storage:/preview-storage
+          - preview-storage:/data
 
         # alter docker command to wait for postgres to start
-        working_dir: /app
-        command: "/bin/bash /app/scripts/wait_for_it.sh preview_database:5432 -- dotnet Evermind.FilePreviewApi.dll"
         logging:
             driver: awslogs
             options:
@@ -177,12 +190,12 @@ services:
 
     preview_database:
         mem_limit: 128m
-        image: "postgres"
+        image: "postgres:9.4"
         ports:
           - "9009:5432"
         environment:
             POSTGRES_PASSWORD: "DigiMed123"
-            POSTGRES_DB: "evermind_files_preview"
+            POSTGRES_DB: "evermind-preview"
         volumes:
             - preview_pgdata:/var/lib/postgresql/data
         logging:
@@ -201,8 +214,11 @@ services:
             - "80:80"
         links:
             - api
+            - preview_api
+            - storage_api
+            - media_api
         working_dir: /app
-        command: "/app/wait_for_it.sh api:80 -- nginx -g 'daemon off;'"
+        command: "./wait_for_it.sh api:80 -- ./wait_for_it.sh storage_api:80 -- ./wait_for_it.sh preview_api:80 -- ./wait_for_it.sh media_api:80 -- nginx -g 'daemon off;'"
         logging:
             driver: awslogs
             options:

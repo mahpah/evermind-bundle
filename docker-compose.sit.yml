@@ -1,0 +1,44 @@
+version: '3'
+services:
+  storage:
+    image: 215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-storage:sit
+    ports:
+      - 9000:80
+    environment:
+      Storage__RootPath: "/var/evermind-sit/storage"
+      WebHostUrl: "https://sit.evermind.vn/storage/"
+      ASPNETCORE_ENVIRONMENT: "Docker"
+      db_host: "dgm-staging.c8h9mndpwrjg.ap-southeast-1.rds.amazonaws.com"
+      db_port: "5432"
+      db_username: "digimed"
+      db_password: "DigiMed123"
+      db_name: "evermind-storage-sit"
+    volumes:
+      - /var/www/evermind-sit/storage:/var/evermind-sit/storage
+
+  preview:
+    image: 215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-preview:sit
+    ports:
+      - 8000:80
+    environment:
+      ASPNETCORE_ENVIRONMENT: "Docker"
+      FileProcessor__MediaServerUrl: "https://sit.evermind.vn/media/"
+      PublicUrl: "https://sit.evermind.vn/preview/"
+      db_host: "dgm-staging.c8h9mndpwrjg.ap-southeast-1.rds.amazonaws.com"
+      db_port: "5432"
+      db_username: "digimed"
+      db_password: "DigiMed123"
+      db_name: "evermind-preview-sit"
+    volumes:
+      - /var/www/evermind-sit/preview:/var/evermind-sit/preview
+
+  media:
+    image: 215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-media:sit
+    ports:
+      - 7777:7777
+    environment:
+      NODE_ENV: sit
+      mediaStorage: "/var/evermind-sit/media"
+      MEDIA_ROOT_URI: "//sit.evermind.vn/media/"
+    volumes:
+      - /var/www/evermind-sit/media:/var/evermind-sit/media

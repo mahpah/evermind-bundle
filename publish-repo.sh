@@ -23,7 +23,7 @@ echo "to remote repository \"$REPO\""
 echo "using Dockerfile \"$DOCKER_FILE\""
 
 echo "Login to AWS container service"
-aws ecr get-login --no-include-email --region ap-southeast-1 | /bin/bash
+# aws ecr get-login --no-include-email --region ap-southeast-1 | /bin/bash
 
 echo "Building $REPO/$IMAGE_NAME_TAG"
 ./publish.sh $MODULE $MODULE/$DOCKER_FILE $IMAGE_NAME_TAG $REPO

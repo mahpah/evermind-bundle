@@ -1,25 +1,31 @@
 version: '3'
 services:
     api:
-        image: digimed/evermind-backend:nightly
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-backend:nightly"
         environment:
             ASPNETCORE_ENVIRONMENT: "Docker"
-            ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=api_database;Port=5432;Database=evermind;Pooling=true;"
             ElasticSearch__Host: "http://elasticsearch"
             ElasticSearch__Port: "9200"
-            Storage__FileServerUrl: "http://storage_api"
-            FilePreview__FileServerUrl: "http://preview_api"
+            Storage__ServerUrl: "http://storage_api"
+            Storage__PublicUrl: "http://localhost:9010/storage"
+            FilePreview__ServerUrl: "http://preview_api"
+            FilePreview__PublicUrl: "http://localhost:9010/preview"
+            PublicUrl: "http://api"
+            db_host: "api_database"
+            db_port: "5432"
+            db_username: "postgres"
+            db_password: "DigiMed123"
+            db_name: "evermind"
         build:
             context: ./evermind-backend
-            dockerfile: Dockerfile.nightly
         ports:
             - "9001:80"
         depends_on:
             - elasticsearch
             - api_database
         # alter docker command to wait for postgres to start
-        working_dir: /app
-        command: "/app/wait_for_it.sh api_database:5432 -- ./docker_run.sh api_database 5432 evermind postgres DigiMed123 elasticsearch:9200"
+        # working_dir: /app
+        # command: "./docker_run.sh"
 
     api_database:
         image: "postgres"
@@ -46,7 +52,7 @@ services:
         environment:
             NODE_ENV: "docker"
             DEBUG: "*"
-        image: digimed/evermind-media:nightly
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-media:nightly"
         build:
             context: ./evermind-media
         ports:
@@ -74,8 +80,12 @@ services:
     storage_api:
         environment:
             ASPNETCORE_ENVIRONMENT: "Docker"
-            ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=storage_database;Port=5432;Database=evermind-storage;Pooling=true;"
-        image: digimed/evermind-storage:nightly
+            db_host: "storage_database"
+            db_port: "5432"
+            db_username: "postgres"
+            db_password: "DigiMed123"
+            db_name: "evermind-storage"
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-storage:nightly"
         build:
             context: ./evermind-storage
         ports:
@@ -83,11 +93,11 @@ services:
         depends_on:
             - storage_database
         volumes:
-            - ./volumes/evm-storage:/evm-storage
+            - ./volumes/evm-storage:/data
 
         # alter docker command to wait for postgres to start
-        working_dir: /app
-        command: "/bin/bash /app/scripts/wait_for_it.sh storage_database:5432 -- dotnet EVM.StorageApi.dll"
+        # working_dir: /app
+        # command: "/bin/bash /app/scripts/wait_for_it.sh storage_database:5432 -- dotnet EVM.StorageApi.dll"
 
     storage_database:
         image: "postgres"
@@ -101,9 +111,13 @@ services:
 
     preview_api:
         environment:
-          ASPNETCORE_ENVIRONMENT: "Docker"
-          ConnectionStrings__DefaultConnection: "User ID=postgres;Password=DigiMed123;Host=preview_database;Port=5432;Database=evermind;Pooling=true;"
-        image: digimed/evermind-preview:nightly
+            ASPNETCORE_ENVIRONMENT: "Docker"
+            db_host: "preview_database"
+            db_port: "5432"
+            db_username: "postgres"
+            db_password: "DigiMed123"
+            db_name: "evermind_files_preview"
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-preview:nightly"
         build:
             context: ./evermind-preview
         ports:
@@ -111,11 +125,11 @@ services:
         depends_on:
           - preview_database
         volumes:
-          - ./volumes/preview-storage:/preview-storage
+          - ./volumes/preview-storage:/data
 
         # alter docker command to wait for postgres to start
-        working_dir: /app
-        command: "/bin/bash /app/scripts/wait_for_it.sh preview_database:5432 -- dotnet Evermind.FilePreviewApi.dll"
+        # working_dir: /app
+        # command: "/bin/bash /app/scripts/wait_for_it.sh preview_database:5432 -- dotnet Evermind.FilePreviewApi.dll"
 
     preview_database:
         image: "postgres"
@@ -128,11 +142,11 @@ services:
             - ./volumes/pgdata:/var/lib/postgresql/data
 
     frontend:
-        image: evermind-frontend:nightly
+        image: "215519188259.dkr.ecr.ap-southeast-1.amazonaws.com/digimed/evermind-frontend:nightly"
         build:
             context: ./evermind-frontend
         ports:
           - "9010:80"
         working_dir: /app
-        command: "/app/wait_for_it.sh api:80 -- nginx -g 'daemon off;'"
+        command: "./wait_for_it.sh api:80 -- ./wait_for_it.sh storage_api:80 -- ./wait_for_it.sh preview_api:80 -- ./wait_for_it.sh media_api:80 -- nginx -g 'daemon off;'"
 
